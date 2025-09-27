@@ -34,25 +34,30 @@ A comprehensive, real-time exam management and monitoring system built with Fast
 
 1. **Navigate to the project directory:**
    ```bash
-   cd "c:\Users\MOHAMMAD EQUAAN\Desktop\DS TASKSS\DS TASK\proctoring"
+   cd "proctoring"
    ```
 
-2. **Activate virtual environment:**
+2. **Create a virtual environment:**
+   ```bash
+   python -m venv .venv
+   ```
+   
+3. **Activate virtual environment:**
    ```bash
    .\.venv\Scripts\Activate.ps1
    ```
 
-3. **Install dependencies:**
+4. **Install dependencies:**
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **Start the system:**
+5. **Start the system:**
    ```bash
    python run.py
    ```
 
-5. **Open your browser:**
+6. **Open your browser:**
    - The system will start on `http://localhost:8001`
    - Your browser should automatically open to the centralized dashboard
 
@@ -283,6 +288,16 @@ If you encounter any issues:
 4. Check browser console for JavaScript errors
 5. Restart the system with `python run.py`
 
+## 👤 Author
+- [Mohammad Equaan Kacchi](https://www.linkedin.com/in/mohammad-equaan-kacchi-4a8a49290/)
+
+## 🤝 Contributors
+- Sajiya Shaikh
+- Tamanna Shaikh
+- Shruti Tambade
+
+## 🙏 Acknowledgment
+Special thanks to **Amit Nerulkar (Mentor)** for his valuable guidance and support.
+
 ---
 
-**🎓 Built with ❤️ for comprehensive exam proctoring and management**

@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Processor Control</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 min-h-screen">
+  <div class="max-w-4xl mx-auto p-6">
+    <header class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl font-bold text-slate-800">Processor Control</h1>
+      <div class="text-sm text-slate-500">Health: <span id="health" class="font-semibold">-</span></div>
+    </header>
+    
+    <!-- Exam Timer -->
+    <div id="examTimer" class="hidden bg-green-600 text-white p-4 rounded-lg mb-6 text-center">
+      <h2 class="text-xl font-bold">⏰ Exam Running</h2>
+      <div id="timeRemaining" class="text-2xl font-mono mt-2">--:--</div>
+    </div>
+
+    <section class="bg-white rounded-lg shadow p-5 mb-6">
+      <h2 class="text-lg font-semibold text-slate-700 mb-3">Exam Controls</h2>
+      <div class="flex items-center flex-wrap gap-3">
+        <input id="duration" type="number" min="30" value="60" class="border p-2 rounded w-40" placeholder="Duration (sec)">
+        <button id="startBtn" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">Start Exam</button>
+        <button id="stopBtn" class="bg-rose-600 text-white px-4 py-2 rounded hover:bg-rose-700">Stop Exam</button>
+        <button id="resetBtn" class="bg-amber-600 text-white px-4 py-2 rounded hover:bg-amber-700">Reset State</button>
+      </div>
+      <p class="mt-3 text-slate-600">Status: <span id="status">Idle</span></p>
+    </section>
+
+    <section class="bg-white rounded-lg shadow p-5 mb-6">
+      <h2 class="text-lg font-semibold text-slate-700 mb-3">Live Summary</h2>
+      <div class="grid grid-cols-2 gap-4">
+        <div class="p-4 border rounded">
+          <div class="text-slate-500 text-sm">Exam</div>
+          <div class="text-slate-800 font-semibold">End Time: <span id="endTime">-</span></div>
+        </div>
+        <div class="p-4 border rounded">
+          <div class="text-slate-500 text-sm">Students Connected</div>
+          <div class="text-slate-800 font-semibold"><span id="studentCount">0</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-white rounded-lg shadow p-5">
+      <h2 class="text-lg font-semibold text-slate-700 mb-3">Cheating Students</h2>
+      <div id="cheatingStudents" class="space-y-3 max-h-64 overflow-y-auto"></div>
+    </section>
+
+    <section class="bg-white rounded-lg shadow p-5">
+      <h2 class="text-lg font-semibold text-slate-700 mb-3">Recent Events</h2>
+      <div id="events" class="h-32 overflow-y-auto border p-2 text-sm"></div>
+    </section>
+  </div>
+
+<script>
+let ws;
+let token = localStorage.getItem('proc_token') || '';
+if (!token) {
+  token = prompt('Enter processor token:', 'teacher_token') || '';
+  localStorage.setItem('proc_token', token);
+}
+ws = new WebSocket('ws://localhost:8001/ws');
+let endTs = null;
+
+function fmt(ts){ return ts ? new Date(ts*1000).toLocaleTimeString() : '-'; }
+async function pingHealth(){
+  try {
+    const h = await fetch('http://localhost:8001/healthz');
+    const r = await h.json();
+    const rz = await fetch('http://localhost:8001/readyz');
+    const rr = await rz.json();
+    document.getElementById('health').textContent = (r.status||'-') + '/' + (rr.status||'-');
+  } catch { document.getElementById('health').textContent = 'down'; }
+}
+setInterval(pingHealth, 5000); pingHealth();
+
+ws.onopen = () => {
+  ws.send(JSON.stringify({ role: 'processor', token }));
+};
+ws.onmessage = (ev) => {
+  try {
+    const data = JSON.parse(ev.data);
+    if (data.type === 'student_list') {
+      document.getElementById('studentCount').textContent = data.students.length;
+      updateCheatingStudents(data.students);
+    }
+    if (data.type === 'exam_started') {
+      endTs = data.end_time; 
+      document.getElementById('endTime').textContent = fmt(endTs); 
+      document.getElementById('status').textContent='Running';
+      // Show exam timer
+      document.getElementById('examTimer').classList.remove('hidden');
+      startExamTimer(data.end_time);
+    }
+    if (data.type === 'exam_finished') {
+      endTs = null; 
+      document.getElementById('endTime').textContent = '-'; 
+      document.getElementById('status').textContent='Finished';
+      // Hide exam timer
+      document.getElementById('examTimer').classList.add('hidden');
+      if (examTimerInterval) clearInterval(examTimerInterval);
+    }
+    if (['submitted','auto_submitted','state_reset'].includes(data.type)) {
+      const el = document.getElementById('events');
+      const div = document.createElement('div');
+      div.textContent = `[${fmt(Date.now()/1000)}] ${JSON.stringify(data)}`;
+      el.appendChild(div); el.scrollTop = el.scrollHeight;
+    }
+  } catch {}
+};
+
+// Exam timer functionality
+let examTimerInterval = null;
+
+function startExamTimer(endTime) {
+  if (examTimerInterval) clearInterval(examTimerInterval);
+  
+  examTimerInterval = setInterval(() => {
+    const now = Date.now() / 1000;
+    const remaining = Math.max(0, endTime - now);
+    
+    if (remaining <= 0) {
+      document.getElementById('timeRemaining').textContent = '00:00';
+      document.getElementById('examTimer').classList.add('hidden');
+      clearInterval(examTimerInterval);
+      return;
+    }
+    
+    const minutes = Math.floor(remaining / 60);
+    const seconds = Math.floor(remaining % 60);
+    document.getElementById('timeRemaining').textContent = 
+      `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }, 1000);
+}
+
+function updateCheatingStudents(students) {
+  const container = document.getElementById('cheatingStudents');
+  container.innerHTML = '';
+
+  const cheatingStudents = students.filter(s => s.flags > 0);
+
+  if (cheatingStudents.length === 0) {
+    container.innerHTML = '<div class="text-gray-500 text-center py-4">No cheating detected yet</div>';
+    return;
+  }
+
+  cheatingStudents.forEach(student => {
+    const div = document.createElement('div');
+    div.className = 'p-3 border rounded bg-red-50 border-red-200';
+
+    const flagClass = student.flags > 1 ? 'text-red-600' : 'text-yellow-600';
+    const flagText = student.flags > 1 ? 'CRITICAL' : 'WARNING';
+
+    div.innerHTML = `
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="font-semibold text-gray-800">${student.student_id} - ${student.name}</div>
+          <div class="text-sm text-gray-600">Last seen: ${fmt(student.last_seen)}</div>
+        </div>
+        <div class="text-right">
+          <div class="font-bold ${flagClass}">${flagText}</div>
+          <div class="text-sm text-gray-600">Flags: ${student.flags}</div>
+        </div>
+      </div>
+    `;
+
+    container.appendChild(div);
+  });
+}
+
+function send(m){ ws.send(JSON.stringify(m)); }
+
+document.getElementById('startBtn').onclick = () => {
+  const duration = parseInt(document.getElementById('duration').value || '60', 10);
+  send({ type: 'start_exam', duration });
+  document.getElementById('status').textContent='Starting…';
+};
+
+document.getElementById('stopBtn').onclick = () => {
+  send({ type: 'stop_exam' });
+  document.getElementById('status').textContent='Stopping…';
+};
+
+document.getElementById('resetBtn').onclick = () => {
+  send({ type: 'reset_state' });
+  document.getElementById('status').textContent='Resetting…';
+};
+</script>
+</body>
+</html>

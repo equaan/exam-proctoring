@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Exam</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-4">
+  <div class="max-w-3xl mx-auto">
+    <h1 class="text-2xl font-bold mb-4">Student Exam</h1>
+    
+    <!-- Exam Timer -->
+    <div id="examTimer" class="hidden bg-red-600 text-white p-4 rounded mb-4 text-center">
+      <h2 class="text-lg font-bold">⏰ Time Remaining</h2>
+      <div id="timeRemaining" class="text-3xl font-mono mt-2">--:--</div>
+    </div>
+
+    <div id="login" class="mb-4 p-4 bg-white rounded shadow">
+      <h2 class="text-lg font-semibold">Login</h2>
+      <div class="mb-4">
+        <label class="block text-sm font-medium mb-2">Select Student:</label>
+        <select id="studentSelect" class="border p-2 rounded w-full">
+          <option value="">Loading students...</option>
+        </select>
+      </div>
+      <div class="flex items-center space-x-2">
+        <input id="sname" placeholder="Name (optional)" class="border p-2 rounded">
+        <button id="loginBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Join</button>
+      </div>
+      <p id="lerr" class="mt-2 text-red-500 hidden"></p>
+    </div>
+
+    <div id="pre" class="hidden mb-4 p-4 bg-blue-50 border border-blue-200 rounded">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold">Exam Status</h2>
+        <div class="flex items-center space-x-2">
+          <button id="backBtn" class="bg-gray-500 text-white px-3 py-1 rounded text-sm hover:bg-gray-600">← Back to Selection</button>
+          <div id="status" class="text-sm text-gray-600">Waiting for exam to start…</div>
+        </div>
+      </div>
+      <p class="mt-2 text-blue-800">You have joined successfully. The exam has not started yet. This page will unlock automatically when your proctor starts the exam.</p>
+    </div>
+
+    <div id="exam" class="hidden mb-4 p-4 bg-white rounded shadow">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold">Exam Workspace</h2>
+        <div class="flex items-center space-x-2">
+          <button id="backBtnExam" class="bg-gray-500 text-white px-3 py-1 rounded text-sm hover:bg-gray-600">← Back to Selection</button>
+          <div id="estatus" class="text-sm text-gray-600">Idle</div>
+        </div>
+      </div>
+      <div class="mt-2 grid grid-cols-1 gap-3">
+        <div class="p-3 border rounded">
+          <div class="font-medium">1) Which property is ensured by consensus?</div>
+          <div class="mt-1 space-x-4">
+            <label><input type="radio" name="q1" value="a"> Availability</label>
+            <label><input type="radio" name="q1" value="b"> Agreement</label>
+            <label><input type="radio" name="q1" value="c"> Partition Tolerance</label>
+            <label><input type="radio" name="q1" value="d"> Sharding</label>
+          </div>
+        </div>
+        <div class="p-3 border rounded">
+          <div class="font-medium">2) CAP: when partitions happen, you must choose</div>
+          <div class="mt-1 space-x-4">
+            <label><input type="radio" name="q2" value="a"> C or A</label>
+            <label><input type="radio" name="q2" value="b"> C or P</label>
+            <label><input type="radio" name="q2" value="c"> A or P</label>
+            <label><input type="radio" name="q2" value="d"> none</label>
+          </div>
+        </div>
+        <div class="p-3 border rounded">
+          <div class="font-medium">3) Raft uses</div>
+          <div class="mt-1 space-x-4">
+            <label><input type="radio" name="q3" value="a"> 2PC</label>
+            <label><input type="radio" name="q3" value="b"> Vector clocks</label>
+            <label><input type="radio" name="q3" value="c"> Paxos ballots</label>
+            <label><input type="radio" name="q3" value="d"> Leader election + logs</label>
+          </div>
+        </div>
+        <div class="p-3 border rounded">
+          <div class="font-medium">4) Eventual consistency means</div>
+          <div class="mt-1 space-x-4">
+            <label><input type="radio" name="q4" value="a"> immediate read-your-writes</label>
+            <label><input type="radio" name="q4" value="b"> strict serializability</label>
+            <label><input type="radio" name="q4" value="c"> convergence over time</label>
+            <label><input type="radio" name="q4" value="d"> linearizability</label>
+          </div>
+        </div>
+        <div class="p-3 border rounded">
+          <div class="font-medium">5) Load balancing needs</div>
+          <div class="mt-1 space-x-4">
+            <label><input type="radio" name="q5" value="a"> non-sticky sockets always</label>
+            <label><input type="radio" name="q5" value="b"> sticky sessions for WebSockets</label>
+            <label><input type="radio" name="q5" value="c"> DB-only routing</label>
+            <label><input type="radio" name="q5" value="d"> no health checks</label>
+          </div>
+        </div>
+      </div>
+      <div class="mt-2 space-x-2">
+        <button id="submitBtn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700" disabled>Submit</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+let ws;
+let studentId = null;
+let autosaveVersion = 0;
+let autosaveTimer = null;
+let examActive = false;
+
+function setStatus(t) { document.getElementById('estatus').textContent = t; }
+function showErr(t) { const e=document.getElementById('lerr'); e.textContent=t; e.classList.remove('hidden'); setTimeout(()=>e.classList.add('hidden'),4000); }
+
+function collectAnswers() {
+  const ans = {};
+  ['q1','q2','q3','q4','q5'].forEach(q => {
+    const el = document.querySelector(`input[name="${q}"]:checked`);
+    if (el) ans[q] = el.value;
+  });
+  return ans;
+}
+
+async function autosaveNow() {
+  if (!studentId) return;
+  const answers = collectAnswers();
+  autosaveVersion += 1;
+  try {
+    const resp = await fetch('http://localhost:8001/autosave', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ student_id: studentId, version: autosaveVersion, answers })
+    });
+    if (!resp.ok) throw new Error('HTTP '+resp.status);
+    setStatus(`Saved v${autosaveVersion}`);
+  } catch(e) {
+    setStatus('Save failed, will retry');
+  }
+}
+
+function startAutosave() {
+  if (autosaveTimer) clearInterval(autosaveTimer);
+  autosaveTimer = setInterval(autosaveNow, 5000);
+}
+
+// Load students from database
+async function loadStudents() {
+  try {
+    const response = await fetch('http://localhost:8001/students');
+    if (!response.ok) throw new Error('Failed to load students');
+    const students = await response.json();
+
+    const selectEl = document.getElementById('studentSelect');
+    selectEl.innerHTML = '<option value="">Select a student...</option>';
+
+    students.forEach(student => {
+      const option = document.createElement('option');
+      option.value = student.student_id;
+      option.textContent = `${student.student_id} - ${student.name}`;
+      selectEl.appendChild(option);
+    });
+
+    // Set default name field
+    document.getElementById('sname').value = '';
+  } catch(e) {
+    showErr('Failed to load students: ' + e.message);
+  }
+}
+
+document.getElementById('loginBtn').onclick = async () => {
+  const selectEl = document.getElementById('studentSelect');
+  const sid = selectEl.value;
+  const name = document.getElementById('sname').value.trim();
+  if (!sid) { showErr('Select a student'); return; }
+  try {
+    ws = new WebSocket('ws://localhost:8001/ws');
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ role: 'student', student_id: sid, name: name || document.querySelector(`#studentSelect option[value="${sid}"]`).textContent.split(' - ')[1] }));
+    };
+    ws.onmessage = async (ev) => {
+      const data = JSON.parse(ev.data);
+      if (data.error) { showErr(data.error); return; }
+      if (data.type === 'joined') {
+        studentId = sid;
+        document.getElementById('login').classList.add('hidden');
+        document.getElementById('pre').classList.remove('hidden');
+        // Load last autosave
+        try {
+          const resp = await fetch(`http://localhost:8001/autosave/${studentId}`);
+          if (resp.ok) {
+            const s = await resp.json();
+            if (s && s.answers) {
+              ['q1','q2','q3','q4','q5'].forEach(q => {
+                const val = s.answers[q];
+                if (val) {
+                  const el = document.querySelector(`input[name="${q}"][value="${val}"]`);
+                  if (el) el.checked = true;
+                }
+              });
+              autosaveVersion = s.version || 0;
+            }
+          }
+        } catch {}
+        startAutosave();
+        setStatus('Waiting…');
+      }
+      if (data.type === 'exam_started') {
+        console.log('Exam started event received:', data);
+        handleExamStarted(data.end_time);
+      }
+      if (data.type === 'exam_finished') {
+        console.log('Exam finished event received');
+        handleExamFinished();
+      }
+      if (data.type === 'submit_ack') {
+        if (data.status === 'ok') {
+          // Student submitted successfully - return to login
+          document.getElementById('pre').classList.add('hidden');
+          document.getElementById('exam').classList.add('hidden');
+          document.getElementById('login').classList.remove('hidden');
+          document.getElementById('examTimer').classList.add('hidden');
+          
+          // Mark student as submitted in dropdown
+          const selectEl = document.getElementById('studentSelect');
+          const selectedOption = selectEl.querySelector(`option[value="${studentId}"]`);
+          if (selectedOption) {
+            selectedOption.textContent = selectedOption.textContent + ' (SUBMITTED)';
+            selectedOption.disabled = true;
+          }
+          
+          studentId = null;
+          if (ws) ws.close();
+          setStatus('Exam submitted successfully');
+          showErr('Exam submitted! You cannot reattempt.');
+        } else if (data.status === 'already') {
+          showErr('Already submitted');
+        }
+      }
+    };
+    
+    // Exam timer functionality
+    let examTimerInterval = null;
+    
+    function handleExamFinished() {
+      document.getElementById('examTimer').classList.add('hidden');
+      if (examTimerInterval) clearInterval(examTimerInterval);
+      setStatus('Exam finished');
+    }
+    
+    function startExamTimer(endTime) {
+      console.log('startExamTimer called with:', endTime);
+      if (examTimerInterval) clearInterval(examTimerInterval);
+      
+      examTimerInterval = setInterval(() => {
+        const now = Date.now() / 1000;
+        const remaining = Math.max(0, endTime - now);
+        
+        if (remaining <= 0) {
+          document.getElementById('timeRemaining').textContent = '00:00';
+          clearInterval(examTimerInterval);
+          // Auto-submit when time runs out
+          if (ws && ws.readyState === WebSocket.OPEN && studentId) {
+            ws.send(JSON.stringify({ type: 'submit' }));
+            setStatus('Time up - Auto-submitted');
+          }
+          return;
+        }
+        
+        const minutes = Math.floor(remaining / 60);
+        const seconds = Math.floor(remaining % 60);
+        document.getElementById('timeRemaining').textContent = 
+          `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      }, 1000);
+    }
+    ws.onclose = () => setStatus('Disconnected');
+  } catch(e) {
+    showErr('Connection failed');
+  }
+};
+
+document.getElementById('submitBtn').onclick = () => {
+  if (!ws || ws.readyState !== WebSocket.OPEN) { showErr('Not connected'); return; }
+  ws.send(JSON.stringify({ type: 'submit' }));
+  setStatus('Submitted');
+};
+
+// Back button functionality
+document.getElementById('backBtn').onclick = () => {
+  goBackToSelection();
+};
+
+document.getElementById('backBtnExam').onclick = () => {
+  goBackToSelection();
+};
+
+function goBackToSelection() {
+  // Close WebSocket connection
+  if (ws) {
+    ws.close();
+    ws = null;
+  }
+  
+  // Reset state
+  studentId = null;
+  autosaveVersion = 0;
+  if (autosaveTimer) {
+    clearInterval(autosaveTimer);
+    autosaveTimer = null;
+  }
+  if (examTimerInterval) {
+    clearInterval(examTimerInterval);
+    examTimerInterval = null;
+  }
+  
+  // Hide all sections except login
+  document.getElementById('pre').classList.add('hidden');
+  document.getElementById('exam').classList.add('hidden');
+  document.getElementById('examTimer').classList.add('hidden');
+  document.getElementById('login').classList.remove('hidden');
+  
+  // Reset form
+  document.getElementById('studentSelect').value = '';
+  document.getElementById('sname').value = '';
+  
+  // Clear any error messages
+  document.getElementById('lerr').classList.add('hidden');
+  
+  setStatus('Select a student to continue');
+}
+
+// React to exam lifecycle from server
+// Unlock exam on start, lock on finish
+function handleExamStarted(endTs) {
+  console.log('handleExamStarted called with endTs:', endTs);
+  examActive = true;
+  document.getElementById('pre').classList.add('hidden');
+  document.getElementById('exam').classList.remove('hidden');
+  document.getElementById('submitBtn').disabled = false;
+  
+  // Show and start timer
+  document.getElementById('examTimer').classList.remove('hidden');
+  startExamTimer(endTs);
+  
+  setStatus('Exam active');
+}
+
+function handleExamFinished() {
+  console.log('handleExamFinished called');
+  examActive = false;
+  document.querySelectorAll('input[type=radio]').forEach(el => el.disabled = true);
+  document.getElementById('submitBtn').disabled = true;
+  document.getElementById('examTimer').classList.add('hidden');
+  if (examTimerInterval) clearInterval(examTimerInterval);
+  
+  // Auto-submit if not already submitted
+  if (ws && ws.readyState === WebSocket.OPEN && studentId) {
+    ws.send(JSON.stringify({ type: 'submit' }));
+  }
+  
+  setStatus('Exam finished - Auto-submitted');
+}
+
+// Load students when page loads
+loadStudents();
+</script>
+</body>
+</html>

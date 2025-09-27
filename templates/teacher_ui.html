@@ -1,0 +1,401 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teacher Proctoring Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-4">
+    <div class="bg-gray-800 text-white p-6 min-h-screen">
+      <h1 class="text-3xl font-bold mb-6">Teacher Dashboard</h1>
+      
+      <!-- Exam Timer -->
+      <div id="examTimer" class="hidden bg-blue-600 text-white p-4 rounded mb-6 text-center">
+        <h2 class="text-xl font-bold">Exam in Progress</h2>
+        <div id="timeRemaining" class="text-2xl font-mono mt-2">--:--</div>
+      </div>
+      
+      <!-- Status and alerts -->
+    <div class="mb-4 p-4 bg-white rounded shadow">
+      <h2 class="text-lg font-semibold">All Students</h2>
+      <table id="studentTable" class="w-full border-collapse">
+        <thead>
+          <tr class="bg-gray-200">
+            <th class="border p-2">Student ID</th>
+            <th class="border p-2">Name</th>
+            <th class="border p-2">Status</th>
+            <th class="border p-2">Flags</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <!-- Cheating Alerts -->
+      <h2 class="text-lg font-semibold text-red-700">Cheating Alerts</h2>
+      <div id="cheatingAlerts" class="mt-2 space-y-2"></div>
+    </div>
+
+    <!-- Marksheet -->
+    <div class="mb-4 p-4 bg-white rounded shadow">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold">Marksheet</h2>
+        <button id="detailedViewBtn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">View Detailed Results</button>
+      </div>
+      <table id="marksTable" class="w-full border-collapse">
+        <thead>
+          <tr class="bg-gray-200">
+            <th class="border p-2">Student ID</th>
+            <th class="border p-2">Name</th>
+            <th class="border p-2">Submitted</th>
+            <th class="border p-2">Marks</th>
+            <th class="border p-2">Flags</th>
+            <th class="border p-2">Submission Time</th>
+            <th class="border p-2">Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const ws = new WebSocket('ws://localhost:8001/ws');
+    let students = [];
+    let cheatingAlerts = [];
+
+    // Show error message
+    function showError(msg) {
+      alert(msg);
+    }
+
+    // Format timestamp to readable time
+    function formatTime(ts) {
+      return ts ? new Date(ts * 1000).toLocaleTimeString() : '-';
+    }
+
+    // Update student table
+    function updateStudents(newStudents) {
+      students = newStudents;
+      const tbody = document.getElementById('studentTable').querySelector('tbody');
+      tbody.innerHTML = '';
+      students.forEach(s => {
+        const row = document.createElement('tr');
+        row.dataset.id = s.student_id;
+        const isOnline = s.last_seen && (Date.now() / 1000 - s.last_seen < 30);
+        const status = s.in_exam ? 'In Exam' : (isOnline ? 'Online' : 'Offline');
+        const statusClass = s.in_exam ? 'text-blue-600' : (isOnline ? 'text-green-600' : 'text-red-600');
+        row.innerHTML = `
+          <td class="border p-2">${s.student_id}</td>
+          <td class="border p-2">${s.name}</td>
+          <td class="border p-2 ${statusClass}">${status}</td>
+          <td class="border p-2 ${s.flags > 1 ? 'text-red-500' : s.flags === 1 ? 'text-yellow-500' : 'text-green-500'}">${s.flags}</td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    // Add cheating alert
+    function addCheatingAlert(studentId, flags) {
+      const alertsDiv = document.getElementById('cheatingAlerts');
+      const alertDiv = document.createElement('div');
+      alertDiv.className = 'p-3 bg-red-100 border border-red-300 rounded';
+      alertDiv.innerHTML = `
+        <div class="flex items-center justify-between">
+          <div>
+            <span class="font-semibold text-red-700">Student ${studentId} caught cheating!</span>
+            <span class="text-sm text-gray-600 ml-2">Flags: ${flags}</span>
+          </div>
+          <div class="space-x-2">
+            <button class="bg-yellow-500 text-white px-3 py-1 rounded text-sm" onclick="applyPenalty('${studentId}', 50)">50% Penalty</button>
+            <button class="bg-red-500 text-white px-3 py-1 rounded text-sm" onclick="applyPenalty('${studentId}', 0)">0% Penalty</button>
+          </div>
+        </div>
+      `;
+      alertsDiv.insertBefore(alertDiv, alertsDiv.firstChild);
+
+      // Keep only last 5 alerts
+      while (alertsDiv.children.length > 5) {
+        alertsDiv.removeChild(alertsDiv.lastChild);
+      }
+    }
+
+    // Apply penalty to student
+    async function applyPenalty(studentId, penalty) {
+      try {
+        const response = await fetch('http://localhost:8001/marks/override', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ student_id: studentId, marks: penalty })
+        });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        updateMarksheet();
+        showError(`Applied ${penalty}% penalty to ${studentId}`);
+      } catch(e) {
+        showError('Failed to apply penalty: ' + e.message);
+      }
+    }
+
+    // Update marks table with retry logic
+    let marksErrorCooldownUntil = 0;
+    const marksEndpoint = 'http://localhost:8001/marks';
+    async function updateMarksheet(attempts = 3) {
+      for (let i = 0; i < attempts; i++) {
+        try {
+          const resp = await fetch(marksEndpoint, { cache: 'no-cache' });
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const data = await resp.json();
+          const tbody = document.getElementById('marksTable').querySelector('tbody');
+          tbody.innerHTML = '';
+          if (data.length === 0) {
+            const row = document.createElement('tr');
+            row.innerHTML = `<td colspan="7" class="border p-2 text-center">No submissions yet</td>`;
+            tbody.appendChild(row);
+            return;
+          }
+          data.forEach(s => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td class="border p-2">${s.student_id}</td>
+              <td class="border p-2">${s.name ?? '-'}</td>
+              <td class="border p-2">${s.submitted ? 'Yes' : 'No'}</td>
+              <td class="border p-2">${s.marks ?? '-'}</td>
+              <td class="border p-2 ${s.flags > 1 ? 'text-red-500' : s.flags === 1 ? 'text-yellow-500' : 'text-green-500'}">${s.flags}</td>
+              <td class="border p-2">${formatTime(s.time)}</td>
+              <td class="border p-2">
+                <button class="bg-gray-700 text-white px-2 py-1 rounded text-sm" onclick="overrideMarks('${s.student_id}')">Override</button>
+              </td>
+            `;
+            tbody.appendChild(row);
+          });
+          return;
+        } catch (e) {
+          console.error('Marksheet fetch error:', e);
+          if (i === attempts - 1) {
+            const nowMs = Date.now();
+            if (nowMs > marksErrorCooldownUntil) {
+              showError(`Failed to fetch marks: ${e.message}`);
+              marksErrorCooldownUntil = nowMs + 5000;
+            }
+          }
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+    }
+
+    // Override marks function
+    async function overrideMarks(studentId) {
+      const val = prompt(`Enter new marks for ${studentId} (0-100):`);
+      if (val == null) return;
+      const num = parseInt(val, 10);
+      if (Number.isNaN(num) || num < 0 || num > 100) {
+        showError('Invalid marks');
+        return;
+      }
+      try {
+        const r = await fetch('http://localhost:8001/marks/override', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ student_id: studentId, marks: num })
+        });
+        if (!r.ok) throw new Error('HTTP '+r.status);
+        updateMarksheet();
+      } catch(e) {
+        showError('Override failed');
+      }
+    }
+
+    // Load all students from database
+    async function loadAllStudents() {
+      try {
+        const response = await fetch('http://localhost:8001/students');
+        if (!response.ok) throw new Error('Failed to load students');
+        const data = await response.json();
+        updateStudents(data);
+      } catch(e) {
+        showError('Failed to load students: ' + e.message);
+      }
+    }
+
+    // WebSocket handlers
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ role: 'teacher', token: 'teacher_token' }));
+      loadAllStudents(); // Load all students on connection
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.error) {
+          showError(data.error);
+          return;
+        }
+
+        if (data.type === 'student_list') {
+          updateStudents(data.students);
+        } else if (data.type === 'flag') {
+          // Handle cheating alerts
+          addCheatingAlert(data.student_id, data.flags);
+          updateStudents(students); // Update student list to reflect new flags
+        } else if (['submitted', 'auto_submitted'].includes(data.type)) {
+          updateMarksheet();
+        } else if (data.type === 'exam_started') {
+          // Show exam timer
+          document.getElementById('examTimer').classList.remove('hidden');
+          startExamTimer(data.end_time);
+        } else if (data.type === 'exam_finished') {
+          // Hide exam timer
+          document.getElementById('examTimer').classList.add('hidden');
+          if (examTimerInterval) clearInterval(examTimerInterval);
+        }
+      } catch (e) {
+        showError('Invalid server message');
+      }
+    };
+
+    // Exam timer functionality
+    let examTimerInterval = null;
+    
+    function startExamTimer(endTime) {
+      if (examTimerInterval) clearInterval(examTimerInterval);
+      
+      examTimerInterval = setInterval(() => {
+        const now = Date.now() / 1000;
+        const remaining = Math.max(0, endTime - now);
+        
+        if (remaining <= 0) {
+          document.getElementById('timeRemaining').textContent = '00:00';
+          document.getElementById('examTimer').classList.add('hidden');
+          clearInterval(examTimerInterval);
+          return;
+        }
+        
+        const minutes = Math.floor(remaining / 60);
+        const seconds = Math.floor(remaining % 60);
+        document.getElementById('timeRemaining').textContent = 
+          `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      }, 1000);
+    }
+
+    ws.onclose = () => showError('Disconnected from server');
+    ws.onerror = () => showError('WebSocket error');
+
+    // Detailed marks view functionality
+    let showingDetailed = false;
+    
+    document.getElementById('detailedViewBtn').onclick = async () => {
+      showingDetailed = !showingDetailed;
+      const btn = document.getElementById('detailedViewBtn');
+      
+      if (showingDetailed) {
+        btn.textContent = 'View Simple Results';
+        btn.className = 'bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700';
+        await updateDetailedMarksheet();
+      } else {
+        btn.textContent = 'View Detailed Results';
+        btn.className = 'bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700';
+        await updateMarksheet();
+      }
+    };
+    
+    // Update detailed marksheet with answer breakdown
+    async function updateDetailedMarksheet() {
+      try {
+        const resp = await fetch('http://localhost:8001/marks/detailed', { cache: 'no-cache' });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        
+        const tbody = document.getElementById('marksTable').querySelector('tbody');
+        tbody.innerHTML = '';
+        
+        if (data.length === 0) {
+          const row = document.createElement('tr');
+          row.innerHTML = `<td colspan="7" class="border p-2 text-center">No submissions yet</td>`;
+          tbody.appendChild(row);
+          return;
+        }
+        
+        data.forEach(s => {
+          const row = document.createElement('tr');
+          const details = s.marks_details || {};
+          
+          // Create answer breakdown
+          let answerBreakdown = '';
+          if (details.answer_details) {
+            answerBreakdown = '<br><small>';
+            Object.keys(details.answer_details).forEach(q => {
+              const ans = details.answer_details[q];
+              const icon = ans.is_correct ? '✅' : '❌';
+              answerBreakdown += `${q.toUpperCase()}: ${ans.student_answer || 'N/A'} ${icon} `;
+            });
+            answerBreakdown += `<br>Correct: ${details.correct_answers || 0}/5, Base: ${details.base_score || 0}, Penalty: ${details.penalty_applied || 0}%</small>`;
+          }
+          
+          row.innerHTML = `
+            <td class="border p-2">${s.student_id}</td>
+            <td class="border p-2">${s.name ?? '-'}</td>
+            <td class="border p-2">${s.submitted ? 'Yes' : 'No'}</td>
+            <td class="border p-2">${s.marks ?? '-'}${answerBreakdown}</td>
+            <td class="border p-2 ${s.flags > 1 ? 'text-red-500' : s.flags === 1 ? 'text-yellow-500' : 'text-green-500'}">${s.flags}</td>
+            <td class="border p-2">${formatTime(s.time)}</td>
+            <td class="border p-2">
+              <button class="bg-gray-700 text-white px-2 py-1 rounded text-sm" onclick="overrideMarks('${s.student_id}')">Override</button>
+            </td>
+          `;
+          tbody.appendChild(row);
+        });
+      } catch (e) {
+        showError('Failed to fetch detailed marks: ' + e.message);
+      }
+    }
+
+    // Periodic updates
+    setInterval(() => {
+      if (showingDetailed) {
+        updateDetailedMarksheet();
+      } else {
+        updateMarksheet();
+      }
+    }, 5000);
+  </script>
+</body>
+</html>

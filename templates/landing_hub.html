@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Proctoring System - Dashboard Hub</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+      background-size: 400% 400%;
+      animation: gradientShift 15s ease infinite;
+      min-height: 100vh;
+    }
+    
+    @keyframes gradientShift {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    
+    .role-card {
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      backdrop-filter: blur(20px);
+      border: 2px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.08);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .role-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+      transition: left 0.6s;
+    }
+    
+    .role-card:hover {
+      transform: translateY(-12px) scale(1.02);
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+      border-color: rgba(255, 255, 255, 0.3);
+      background: rgba(255, 255, 255, 0.15);
+    }
+    
+    .role-card:hover::before {
+      left: 100%;
+    }
+    
+    .role-card:hover .card-icon {
+      transform: scale(1.1) rotate(5deg);
+    }
+    
+    .role-card:hover .card-button {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      transform: scale(1.05);
+    }
+    
+    .card-icon {
+      transition: all 0.3s ease;
+    }
+    
+    .card-button {
+      transition: all 0.3s ease;
+    }
+    
+    .status-indicator {
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(1.05); }
+    }
+    
+    .glass-effect {
+      background: rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    }
+    
+    .floating-animation {
+      animation: float 8s ease-in-out infinite;
+    }
+    
+    @keyframes float {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      33% { transform: translateY(-15px) rotate(1deg); }
+      66% { transform: translateY(-5px) rotate(-1deg); }
+    }
+    
+    .modern-button {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .modern-button::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+      transition: left 0.5s;
+    }
+    
+    .modern-button:hover::before {
+      left: 100%;
+    }
+    
+    .modern-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.5rem;
+    }
+    
+    .stat-card {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(15px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      transition: all 0.3s ease;
+    }
+    
+    .stat-card:hover {
+      background: rgba(255, 255, 255, 0.15);
+      transform: translateY(-4px);
+    }
+    
+    .header-title {
+      background: linear-gradient(135deg, #ffffff, #f0f0f0);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+  </style>
+</head>
+<body class="overflow-x-hidden">
+  <!-- Background Elements -->
+  <div class="fixed inset-0 overflow-hidden pointer-events-none">
+    <div class="absolute -top-40 -right-40 w-80 h-80 bg-white opacity-10 rounded-full floating-animation"></div>
+    <div class="absolute -bottom-40 -left-40 w-96 h-96 bg-white opacity-5 rounded-full floating-animation" style="animation-delay: -3s;"></div>
+  </div>
+
+  <div class="relative z-10 min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="text-center py-8">
+      <div class="glass-effect rounded-3xl mx-auto max-w-4xl p-8 mb-8">
+        <h1 class="text-6xl font-bold header-title mb-4">
+          🎓 Proctoring System
+        </h1>
+        <p class="text-xl text-gray-100 font-light">
+          Modern Exam Management & Monitoring Platform
+        </p>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 container mx-auto px-6">
+      <!-- Role Selection Cards -->
+      <div class="grid lg:grid-cols-3 md:grid-cols-2 gap-8 mb-12">
+        
+        <!-- Teacher UI Card -->
+        <div class="role-card rounded-3xl p-8 text-center cursor-pointer" onclick="navigateToRole('teacher')">
+          <div class="card-icon text-7xl mb-6">
+            👨‍🏫
+          </div>
+          <h3 class="text-2xl font-bold text-white mb-4">Teacher Dashboard</h3>
+          <p class="text-gray-200 mb-8 leading-relaxed text-sm">
+            Monitor students in real-time, view cheating alerts, manage detailed marksheets, and apply penalties during active exams.
+          </p>
+          <div class="card-button bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 rounded-full font-semibold inline-block">
+            Access Dashboard →
+          </div>
+          <div class="mt-6 text-xs text-gray-300 space-y-1">
+            <div>✓ Real-time monitoring</div>
+            <div>✓ Penalty management</div>
+            <div>✓ Detailed reports</div>
+          </div>
+        </div>
+
+        <!-- Processor UI Card -->
+        <div class="role-card rounded-3xl p-8 text-center cursor-pointer" onclick="navigateToRole('processor')">
+          <div class="card-icon text-7xl mb-6">
+            ⚙️
+          </div>
+          <h3 class="text-2xl font-bold text-white mb-4">Processor Control</h3>
+          <p class="text-gray-200 mb-8 leading-relaxed text-sm">
+            Start and stop exams, configure exam duration, manage system state, and control the entire examination flow.
+          </p>
+          <div class="card-button bg-purple-500 hover:bg-purple-600 text-white px-8 py-3 rounded-full font-semibold inline-block">
+            Access Control →
+          </div>
+          <div class="mt-6 text-xs text-gray-300 space-y-1">
+            <div>✓ Exam control</div>
+            <div>✓ Timer management</div>
+            <div>✓ System configuration</div>
+          </div>
+        </div>
+
+        <!-- Student UI Card -->
+        <div class="role-card rounded-3xl p-8 text-center cursor-pointer lg:col-span-1 md:col-span-2 lg:mx-0 md:mx-auto md:max-w-md" onclick="navigateToRole('student')">
+          <div class="card-icon text-7xl mb-6">
+            👨‍🎓
+          </div>
+          <h3 class="text-2xl font-bold text-white mb-4">Student Portal</h3>
+          <p class="text-gray-200 mb-8 leading-relaxed text-sm">
+            Take exams with countdown timer, submit answers securely, and access the comprehensive MCQ examination interface.
+          </p>
+          <div class="card-button bg-green-500 hover:bg-green-600 text-white px-8 py-3 rounded-full font-semibold inline-block">
+            Access Portal →
+          </div>
+          <div class="mt-6 text-xs text-gray-300 space-y-1">
+            <div>✓ MCQ interface</div>
+            <div>✓ Auto-save feature</div>
+            <div>✓ Timer display</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- System Status Panel -->
+      <div class="glass-effect rounded-3xl p-8 mb-8">
+        <h2 class="text-3xl font-bold text-white mb-8 text-center">
+          📊 System Status
+        </h2>
+        
+        <div class="stats-grid">
+          <!-- Server Status -->
+          <div class="stat-card rounded-2xl p-6 text-center">
+            <div class="status-indicator text-4xl mb-4">🟢</div>
+            <div class="text-white font-semibold text-lg">Server Status</div>
+            <div id="serverStatus" class="text-green-300 text-sm mt-2">Online</div>
+          </div>
+          
+          <!-- Students Loaded -->
+          <div class="stat-card rounded-2xl p-6 text-center">
+            <div class="text-4xl mb-4">👥</div>
+            <div class="text-white font-semibold text-lg">Students Loaded</div>
+            <div id="studentsCount" class="text-blue-300 text-sm mt-2">Loading...</div>
+          </div>
+          
+          <!-- Active Exams -->
+          <div class="stat-card rounded-2xl p-6 text-center">
+            <div class="text-4xl mb-4">📝</div>
+            <div class="text-white font-semibold text-lg">Active Exams</div>
+            <div id="activeExams" class="text-purple-300 text-sm mt-2">0</div>
+          </div>
+          
+          <!-- System Health -->
+          <div class="stat-card rounded-2xl p-6 text-center">
+            <div class="text-4xl mb-4">💚</div>
+            <div class="text-white font-semibold text-lg">System Health</div>
+            <div id="systemHealth" class="text-green-300 text-sm mt-2">Excellent</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="glass-effect rounded-3xl p-8 mb-8">
+        <h2 class="text-3xl font-bold text-white mb-8 text-center">
+          ⚡ Quick Actions
+        </h2>
+        
+        <div class="flex flex-wrap justify-center gap-6">
+          <button onclick="quickAction('start-exam')" class="modern-button text-white px-8 py-4 rounded-full font-semibold">
+            🚀 Quick Start Exam
+          </button>
+          <button onclick="quickAction('view-results')" class="modern-button text-white px-8 py-4 rounded-full font-semibold">
+            📊 View Results
+          </button>
+          <button onclick="quickAction('system-reset')" class="modern-button text-white px-8 py-4 rounded-full font-semibold">
+            🔄 Reset System
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="text-center py-6">
+      <div class="glass-effect rounded-2xl mx-auto max-w-2xl p-4">
+        <p class="text-gray-300">
+          Built with ❤️ for comprehensive exam proctoring • Version 2.0
+        </p>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    // Navigation functions
+    function navigateToRole(role) {
+      // Add loading animation
+      const card = event.currentTarget;
+      card.style.transform = 'scale(0.95)';
+      
+      setTimeout(() => {
+        window.location.href = `/${role}`;
+      }, 200);
+    }
+
+    // Quick actions
+    function quickAction(action) {
+      switch(action) {
+        case 'start-exam':
+          window.location.href = '/processor';
+          break;
+        case 'view-results':
+          window.location.href = '/teacher';
+          break;
+        case 'system-reset':
+          if(confirm('Are you sure you want to reset the system?')) {
+            fetch('/reset', { method: 'POST' })
+              .then(() => location.reload());
+          }
+          break;
+      }
+    }
+
+    // Load system status
+    async function loadSystemStatus() {
+      try {
+        // Check server health
+        const healthResponse = await fetch('/healthz');
+        document.getElementById('serverStatus').textContent = 
+          healthResponse.ok ? 'Online' : 'Offline';
+        
+        // Load students count
+        const studentsResponse = await fetch('/students');
+        const students = await studentsResponse.json();
+        document.getElementById('studentsCount').textContent = 
+          `${students.length} loaded`;
+        
+        // Check active exams (simplified)
+        const marksResponse = await fetch('/marks');
+        const marks = await marksResponse.json();
+        const activeCount = marks.filter(m => !m.submitted).length;
+        document.getElementById('activeExams').textContent = 
+          activeCount > 0 ? `${activeCount} students` : '0';
+        
+      } catch (error) {
+        console.error('Failed to load system status:', error);
+        document.getElementById('serverStatus').textContent = 'Error';
+        document.getElementById('studentsCount').textContent = 'Error';
+        document.getElementById('systemHealth').textContent = 'Check Connection';
+      }
+    }
+
+    // Load status on page load
+    loadSystemStatus();
+    
+    // Refresh status every 30 seconds
+    setInterval(loadSystemStatus, 30000);
+  </script>
+</body>
+</html>

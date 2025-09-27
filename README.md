@@ -292,12 +292,12 @@ If you encounter any issues:
 - [Mohammad Equaan Kacchi](https://www.linkedin.com/in/mohammad-equaan-kacchi-4a8a49290/)
 
 ## 🤝 Contributors
-- Sajiya Shaikh
-- Tamanna Shaikh
-- Shruti Tambade
+- [Saziya Shaikh](https://www.linkedin.com/in/shaziya-shaikh-32401827b/)
+- [Tamanna Shaikh](https://www.linkedin.com/in/tamanna-shaikh-5b269127b/)
+- [Shruti Tambade](https://www.linkedin.com/in/shruti-tambade0605/)
 
 ## 🙏 Acknowledgment
-Special thanks to **Amit Nerulkar (Mentor)** for his valuable guidance and support.
+Special thanks to **Amit Nerurkar (Mentor)** for his valuable guidance and support.
 
 ---
 
